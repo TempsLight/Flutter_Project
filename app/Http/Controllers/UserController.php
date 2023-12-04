@@ -30,8 +30,8 @@ class UserController extends Controller
             'password' => Hash::make($request->password)
         ]);
 
-        $token =$users->CreateToken('Personal Access Token')->plainTextToken;
-        $response = ['user'=> $users, 'token'=>$token];
+        //$token =$users->CreateToken('Personal Access Token')->plainTextToken;
+        $response = ['user'=> $users];
         return response()->json($response,200);
     } 
 
