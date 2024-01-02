@@ -6,7 +6,7 @@ namespace App\Http\Controllers;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
-use Validator;
+use Illuminate\Support\Facades\Validator;
 
 
 class UserController extends Controller
@@ -30,8 +30,8 @@ class UserController extends Controller
             'password' => Hash::make($request->password)
         ]);
 
-        //$token =$users->CreateToken('Personal Access Token')->plainTextToken;
-        $response = ['user'=> $users];
+        $token = $users->CreateToken('Personal Access Token')->plainTextToken;
+        $response = ['user'=> $users, 'token'=>$token];
         return response()->json($response,200);
     } 
 
@@ -43,12 +43,12 @@ class UserController extends Controller
         ];
         $request->validate($rules);
         // find user id in the table
-        $users = User::where('email', $request->email)->first();
+        $user = User::where('email', $request->email)->first();
         // if user email found and password matched 
-        if ($users && Hash::check($request->password, $users->password)){
-            $token = $users->createToken('Personal Access Token')->plainTextToken;
-            $response=['user'=>$users, 'token'=>$token];
-            return response()->json($request,200);
+        if ($user && Hash::check($request->password, $user->password)){
+            $token = $user->createToken('Personal Access Token')->plainTextToken;
+            $response=['user'=>$user , 'token'=>$token];
+            return response()->json($response,200);
         }
         $response = ['message'=> 'Incorrect Email or Password'];
         return response()->json($response,400);
@@ -108,4 +108,6 @@ class UserController extends Controller
         ];
         return response()->json($data, 200);
     }
+    
+
 }
