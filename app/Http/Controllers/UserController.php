@@ -19,8 +19,8 @@ class UserController extends Controller
             'email' => 'required|string|unique:users',
             'password' => 'required|string|min:6',
         ];
-        $validator = Validator::make($request->all(),$rules);
-        if ($validator->fails()){
+        $validator = Validator::make($request->all(), $rules);
+        if ($validator->fails()) {
             return response()->json($validator->errors(), 400);
         }
         //create new users
@@ -31,11 +31,12 @@ class UserController extends Controller
         ]);
 
         $token = $users->CreateToken('Personal Access Token')->plainTextToken;
-        $response = ['user'=> $users, 'token'=>$token];
-        return response()->json($response,200);
-    } 
+        $response = ['user' => $users, 'token' => $token];
+        return response()->json($response, 200);
+    }
 
-    public function login(Request $request){
+    public function login(Request $request)
+    {
         // validate inputs
         $rules = [
             'email' => 'required',
@@ -45,13 +46,13 @@ class UserController extends Controller
         // find user id in the table
         $user = User::where('email', $request->email)->first();
         // if user email found and password matched 
-        if ($user && Hash::check($request->password, $user->password)){
+        if ($user && Hash::check($request->password, $user->password)) {
             $token = $user->createToken('Personal Access Token')->plainTextToken;
-            $response=['user'=>$user , 'token'=>$token];
-            return response()->json($response,200);
+            $response = ['user' => $user, 'token' => $token];
+            return response()->json($response, 200);
         }
-        $response = ['message'=> 'Incorrect Email or Password'];
-        return response()->json($response,400);
+        $response = ['message' => 'Incorrect Email or Password'];
+        return response()->json($response, 400);
     }
 
 
@@ -108,6 +109,16 @@ class UserController extends Controller
         ];
         return response()->json($data, 200);
     }
-    
 
+    public function logout(Request $request)
+    {
+        // Get user who requested the logout
+        $user = $request->user();
+
+        // Revoke all tokens...
+        $user->tokens()->where('id', $user->currentAccessToken()->id)->delete();
+
+        // Return response
+        return response()->json('Logged out successfully', 200);
+    }
 }
