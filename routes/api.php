@@ -15,8 +15,12 @@ use Illuminate\Support\Facades\Route;
 |
 */
 
-Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
-    return $request->user();
+Route::middleware('auth:sanctum')->group(function () {
+    Route::get('/user', function (Request $request) {
+        return $request->user();
+    });
+
+    Route::post('/users/sendMoney', [UserController::class, 'sendMoney']);
 });
 
 Route::get('/users', [UserController::class, 'index']);
@@ -25,3 +29,4 @@ Route::post('/users/login', [UserController::class, 'login']);
 Route::put('/users/edit/{id}', [UserController::class, 'editUser']);
 Route::delete('/users/delete/{id}', [UserController::class, 'deleteUser']);
 Route::post('/users/logout', [UserController::class, 'logout']);
+

@@ -98,6 +98,48 @@ class UserController extends Controller
         }
     }
 
+    public function sendMoney(Request $request)
+    {
+        // Validate the request data
+        $request->validate([
+            'receiver_id' => 'required',
+            'amount' => 'required|numeric'
+        ]);
+
+        // Find the sender and receiver in the database
+        $sender = $request->user();
+
+        // Check if the sender is authenticated
+        if (!$sender) {
+            return response()->json(['message' => 'Unauthenticated'], 401);
+        }
+
+        $receiver = User::find($request->receiver_id);
+
+        // Check if the receiver exists
+        if (!$receiver) {
+            return response()->json(['message' => 'Receiver not found'], 404);
+        }
+
+        // Check if the sender has enough balance
+        if ($sender->balance < $request->amount) {
+            return response()->json(['message' => 'Insufficient balance'], 400);
+        }
+
+        // Perform the transaction
+        $sender->balance -= $request->amount;
+        $receiver->balance += $request->amount;
+
+        // Save the changes to the database
+        $sender->save();
+        $receiver->save();
+
+        // Return a success message
+        return response()->json(['message' => 'Transaction successful'], 200);
+    }
+
+
+
     public  function deleteUser($id)
     {
         $user = User::find($id);
