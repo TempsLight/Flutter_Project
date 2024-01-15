@@ -4,7 +4,9 @@ namespace App\Http\Controllers;
 
 
 use App\Models\User;
+use App\Models\Transaction;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
 
@@ -18,6 +20,7 @@ class UserController extends Controller
             'name' => 'required|string',
             'email' => 'required|string|unique:users',
             'password' => 'required|string|min:6',
+            'phone_number' => 'required|string|unique:users',
         ];
         $validator = Validator::make($request->all(), $rules);
         if ($validator->fails()) {
@@ -27,7 +30,9 @@ class UserController extends Controller
         $users = User::create([
             'name' => $request->name,
             'email' => $request->email,
-            'password' => Hash::make($request->password)
+            'password' => Hash::make($request->password),
+            'phone_number' => $request->phone_number,
+            'age' => $request->age,
         ]);
 
         $token = $users->CreateToken('Personal Access Token')->plainTextToken;
@@ -66,7 +71,16 @@ class UserController extends Controller
         return response()->json($data, 200);
     }
 
+    public function getAuthenticatedUser(Request $request)
+    {
+        $user = $request->user();
 
+        if ($user) {
+            return response()->json(['user' => $user], 200);
+        } else {
+            return response()->json(['message' => 'Unauthenticated'], 401);
+        }
+    }
 
     public function editUser(Request $request, $id)
     {
@@ -98,58 +112,29 @@ class UserController extends Controller
         }
     }
 
-    public function sendMoney(Request $request)
-    {
-        // Validate the request data
-        $request->validate([
-            'receiver_id' => 'required',
-            'amount' => 'required|numeric'
-        ]);
-
-        // Find the sender and receiver in the database
-        $sender = $request->user();
-
-        // Check if the sender is authenticated
-        if (!$sender) {
-            return response()->json(['message' => 'Unauthenticated'], 401);
-        }
-
-        $receiver = User::find($request->receiver_id);
-
-        // Check if the receiver exists
-        if (!$receiver) {
-            return response()->json(['message' => 'Receiver not found'], 404);
-        }
-
-        // Check if the sender has enough balance
-        if ($sender->balance < $request->amount) {
-            return response()->json(['message' => 'Insufficient balance'], 400);
-        }
-
-        // Perform the transaction
-        $sender->balance -= $request->amount;
-        $receiver->balance += $request->amount;
-
-        // Save the changes to the database
-        $sender->save();
-        $receiver->save();
-
-        // Return a success message
-        return response()->json(['message' => 'Transaction successful'], 200);
-    }
 
 
 
-    public  function deleteUser($id)
+    public function deleteUser($id)
     {
         $user = User::find($id);
 
-        $user->delete();
-        $data = [
-            'status' => 200,
-            'message' => 'Deleted Successfully'
-        ];
-        return response()->json($data, 200);
+        if ($user) {
+            $user->is_deleted = 1;
+            $user->save();
+
+            $data = [
+                'status' => 200,
+                'message' => 'User deleted successfully'
+            ];
+        } else {
+            $data = [
+                'status' => 404,
+                'message' => 'User not found'
+            ];
+        }
+
+        return response()->json($data, $data['status']);
     }
 
     public function logout(Request $request)
@@ -162,5 +147,132 @@ class UserController extends Controller
 
         // Return response
         return response()->json('Logged out successfully', 200);
+    }
+
+    public function depositMoney(Request $request)
+    {
+        $phone_number = $request->phone_number;
+        $amount = $request->amount;
+
+        $user = User::where('phone_number', $phone_number)->first();
+
+        if (!$user) {
+            return response()->json(['message' => 'User not found'], 404);
+        }
+
+        DB::beginTransaction();
+
+        try {
+            $user->balance += $amount;
+            $user->save();
+        
+            $transaction = new Transaction;
+            $transaction->phone_number = $phone_number;
+            $transaction->amount = $amount;
+            $transaction->type = 'deposit';
+            $transaction->save();
+        
+            DB::commit();
+        } catch (\Exception $e) {
+            DB::rollback();
+        
+            // Return the exception message
+            return response()->json(['message' => 'An error occurred while depositing money', 'error' => $e->getMessage()], 500);
+        }
+
+        return response()->json(['message' => 'Money deposited successfully'], 200);
+    }
+
+    public function sendMoney(Request $request)
+    {
+        // Validate the request data
+        $request->validate([
+            'phone_number' => 'required|exists:users,phone_number',
+            'amount' => 'required|numeric'
+        ]);
+
+        // Find the sender and receiver in the database
+        $sender = $request->user();
+
+        // Check if the sender is authenticated
+        if (!$sender) {
+            return response()->json(['message' => 'Unauthenticated'], 401);
+        }
+
+        $receiver = User::where('phone_number', $request->phone_number)->first();
+
+        // Check if the receiver exists
+        if (!$receiver) {
+            return response()->json(['message' => 'Receiver not found'], 404);
+        }
+
+        // Check if the sender has enough balance
+        if ($sender->balance < $request->amount) {
+            return response()->json(['message' => 'Insufficient balance'], 400);
+        }
+
+        // Start a database transaction
+        DB::beginTransaction();
+
+        try {
+            // Perform the transaction
+            $sender->balance -= $request->amount;
+            $sender->save();
+        
+            $receiver->balance += $request->amount;
+            $receiver->save();
+        
+            // Create a new transaction
+            $transaction = new Transaction([
+                'phone_number' => $sender->phone_number,
+                'receiver_phone_number' => $request->phone_number, // Set the receiver_phone_number
+                'amount' => $request->amount,
+                'type' => 'transfer',
+            ]);
+        
+            $transaction->save();
+        
+            // Commit the transaction
+            DB::commit();
+        
+            return response()->json(['message' => 'Money sent successfully'], 200);
+        } catch (\Exception $e) {
+            // Rollback the transaction
+            DB::rollback();
+        
+            // Return the exception message
+            return response()->json(['message' => 'Transaction failed', 'error' => $e->getMessage()], 500);
+        }
+    }
+
+    public function getTransactionLogs()
+    {
+        $user = auth()->user();
+
+        // Get all transactions of the user
+        $transactions = Transaction::where('phone_number', $user->phone_number)
+        ->with('receiver')
+        ->get();
+
+        // Get the transactions where the user is the receiver
+        $receivedTransactions = $transactions->where('type', 'transfer');
+
+        // Get the transactions where the user has deposited money
+        $depositedTransactions = $transactions->where('type', 'deposit');
+
+        // Get the transactions where the user has transferred money
+        $transferredTransactions = $transactions->where('type', 'transfer');
+
+        // Calculate the total received, deposited, and transferred money
+        $receivedMoney = $receivedTransactions->sum('amount');
+        $depositedMoney = $depositedTransactions->sum('amount');
+        $transferredMoney = $transferredTransactions->sum('amount');
+
+        return response()->json([
+            'transactions' => $transactions,
+            'receivedMoney' => $receivedMoney,
+            'depositedMoney' => $depositedMoney,
+            'transferredMoney' => $transferredMoney
+        ], 200);
     }
 }

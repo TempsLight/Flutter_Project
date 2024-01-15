@@ -21,6 +21,9 @@ Route::middleware('auth:sanctum')->group(function () {
     });
 
     Route::post('/users/sendMoney', [UserController::class, 'sendMoney']);
+    Route::get('/users/me', [UserController::class, 'getAuthenticatedUser']);
+    Route::post('/users/depositMoney', [UserController::class, 'depositMoney']);
+    Route::get('/users/transactions', [UserController::class, 'getTransactionLogs']);
 });
 
 Route::get('/users', [UserController::class, 'index']);
