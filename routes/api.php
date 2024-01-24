@@ -24,12 +24,19 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/users/me', [UserController::class, 'getAuthenticatedUser']);
     Route::post('/users/depositMoney', [UserController::class, 'depositMoney']);
     Route::get('/users/transactions', [UserController::class, 'getTransactionLogs']);
+    
+
 });
 
 Route::get('/users', [UserController::class, 'index']);
-Route::post('/users', [UserController::class, 'createUser']);
-Route::post('/users/login', [UserController::class, 'login']);
+
 Route::put('/users/edit/{id}', [UserController::class, 'editUser']);
+Route::post('/users', [UserController::class, 'createUser']);
+
+Route::post('/users/login', [UserController::class, 'login']);
+
 Route::delete('/users/delete/{id}', [UserController::class, 'deleteUser']);
 Route::post('/users/logout', [UserController::class, 'logout']);
 
+
+Route::delete('/transactions/{transactionId}', [UserController::class, 'deleteTransaction']);

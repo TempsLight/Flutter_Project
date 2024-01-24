@@ -9,7 +9,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
-
+use Illuminate\Support\Facades\Log;
 
 class UserController extends Controller
 {
@@ -21,6 +21,7 @@ class UserController extends Controller
             'email' => 'required|string|unique:users',
             'password' => 'required|string|min:6',
             'phone_number' => 'required|string|unique:users',
+            'age' => 'required|integer',
         ];
         $validator = Validator::make($request->all(), $rules);
         if ($validator->fails()) {
@@ -90,7 +91,6 @@ class UserController extends Controller
         ]);
 
         if ($validator->fails()) {
-
             $data = [
                 "status" => 422,
                 "message" => $validator->messages()
@@ -99,19 +99,17 @@ class UserController extends Controller
         } else {
             $user = User::find($id);
 
+            if ($user === null) {
+                return response()->json(['message' => 'User not found'], 404);
+            }
+    
             $user->name = $request->name;
             $user->email = $request->email;
-
             $user->save();
 
-            $data = [
-                'status' => 200,
-                'message' => 'Data Updated Successfully'
-            ];
-            return response()->json($data, 200);
+            return response()->json(['message' => 'Data Updated Successfully'], 200);
         }
     }
-
 
 
 
@@ -165,17 +163,17 @@ class UserController extends Controller
         try {
             $user->balance += $amount;
             $user->save();
-        
+
             $transaction = new Transaction;
             $transaction->phone_number = $phone_number;
             $transaction->amount = $amount;
             $transaction->type = 'deposit';
             $transaction->save();
-        
+
             DB::commit();
         } catch (\Exception $e) {
             DB::rollback();
-        
+
             // Return the exception message
             return response()->json(['message' => 'An error occurred while depositing money', 'error' => $e->getMessage()], 500);
         }
@@ -218,10 +216,10 @@ class UserController extends Controller
             // Perform the transaction
             $sender->balance -= $request->amount;
             $sender->save();
-        
+
             $receiver->balance += $request->amount;
             $receiver->save();
-        
+
             // Create a new transaction
             $transaction = new Transaction([
                 'phone_number' => $sender->phone_number,
@@ -229,17 +227,17 @@ class UserController extends Controller
                 'amount' => $request->amount,
                 'type' => 'transfer',
             ]);
-        
+
             $transaction->save();
-        
+
             // Commit the transaction
             DB::commit();
-        
+
             return response()->json(['message' => 'Money sent successfully'], 200);
         } catch (\Exception $e) {
             // Rollback the transaction
             DB::rollback();
-        
+
             // Return the exception message
             return response()->json(['message' => 'Transaction failed', 'error' => $e->getMessage()], 500);
         }
@@ -251,8 +249,9 @@ class UserController extends Controller
 
         // Get all transactions of the user
         $transactions = Transaction::where('phone_number', $user->phone_number)
-        ->with('receiver')
-        ->get();
+            ->with('receiver')
+            ->where('isDeleted', 0)
+            ->get();
 
         // Get the transactions where the user is the receiver
         $receivedTransactions = $transactions->where('type', 'transfer');
@@ -274,5 +273,22 @@ class UserController extends Controller
             'depositedMoney' => $depositedMoney,
             'transferredMoney' => $transferredMoney
         ], 200);
+    }
+
+
+    public function deleteTransaction($id)
+    {
+        // Find the transaction
+        $transaction = Transaction::find($id);
+
+        if (!$transaction) {
+            return response()->json(['message' => 'Transaction not found'], 404);
+        }
+
+        // Update the isDeleted column
+        $transaction->isDeleted = 1;
+        $transaction->save();
+
+        return response()->json(['message' => 'Transaction deleted successfully']);
     }
 }
