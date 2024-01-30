@@ -22,6 +22,7 @@ class UserController extends Controller
             'password' => 'required|string|min:6',
             'phone_number' => 'required|string|unique:users',
             'age' => 'required|integer',
+            'sex' => 'required|string'
         ];
         $validator = Validator::make($request->all(), $rules);
         if ($validator->fails()) {
@@ -34,6 +35,7 @@ class UserController extends Controller
             'password' => Hash::make($request->password),
             'phone_number' => $request->phone_number,
             'age' => $request->age,
+            'sex' => $request->sex,
         ]);
 
         $token = $users->CreateToken('Personal Access Token')->plainTextToken;
@@ -72,6 +74,8 @@ class UserController extends Controller
         return response()->json($data, 200);
     }
 
+    
+
     public function getAuthenticatedUser(Request $request)
     {
         $user = $request->user();
@@ -102,7 +106,7 @@ class UserController extends Controller
             if ($user === null) {
                 return response()->json(['message' => 'User not found'], 404);
             }
-    
+
             $user->name = $request->name;
             $user->email = $request->email;
             $user->save();
@@ -223,7 +227,7 @@ class UserController extends Controller
             // Create a new transaction
             $transaction = new Transaction([
                 'phone_number' => $sender->phone_number,
-                'receiver_phone_number' => $request->phone_number, // Set the receiver_phone_number
+                'receiver_phone_number' => $request->phone_number, 
                 'amount' => $request->amount,
                 'type' => 'transfer',
             ]);
